@@ -1,0 +1,78 @@
+{{ reserveImport "context"  }}
+{{ reserveImport "fmt"  }}
+{{ reserveImport "io"  }}
+{{ reserveImport "strconv"  }}
+{{ reserveImport "time"  }}
+{{ reserveImport "sync"  }}
+{{ reserveImport "errors"  }}
+{{ reserveImport "bytes"  }}
+{{ reserveImport "strings"  }}
+
+{{ reserveImport "github.com/randallmlough/gqlutils" }}
+{{ reserveImport "github.com/vektah/gqlparser/v2" }}
+{{ reserveImport "github.com/vektah/gqlparser/v2/ast" }}
+{{ reserveImport "github.com/99designs/gqlgen/graphql" }}
+{{ reserveImport "github.com/99designs/gqlgen/graphql/introspection" }}
+
+{{ reserveImport "github.com/ericlagergren/decimal" }}
+{{ reserveImport "github.com/volatiletech/sqlboiler/v4/boil" }}
+{{ reserveImport "github.com/volatiletech/sqlboiler/v4/queries" }}
+{{ reserveImport "github.com/volatiletech/sqlboiler/v4/queries/qm" }}
+{{ reserveImport "github.com/volatiletech/sqlboiler/v4/queries/qmhelper" }}
+{{ reserveImport "github.com/volatiletech/sqlboiler/v4/types" }}
+{{ reserveImport "github.com/volatiletech/null/v8" }}
+
+{{ reserveImport "database/sql" }}
+{{ reserveImport  $.BackendModelsPath }}
+{{ reserveImport  $.FrontendModelsPath }}
+
+
+var TablePreloadMap = map[string]map[string]boilergql.ColumnSetting{
+	{{ range $model := .Models -}}
+	{{ if $model.IsPreloadable -}}
+		models.TableNames.{{- $model.Name }}: {
+			{{- range $value := $model.PreloadArray }}
+				 "{{$value.Key}}": {
+					 Name: {{$value.ColumnSetting.Name}},
+					 RelationshipModelName: models.TableNames.{{$value.ColumnSetting.RelationshipModelName}},
+					 IDAvailable: {{$value.ColumnSetting.IDAvailable}},
+				},
+			{{- end }}
+		},
+	{{ end -}}
+	{{ end -}}
+}
+
+{{ range $model := .Models }}
+	{{with .Description }} {{.|prefixLines "// "}} {{end}}
+
+	{{ if $model.IsPreloadable -}}
+	func Get{{ .Name|go }}PreloadMods(ctx context.Context) (queryMods []qm.QueryMod) {
+		return boilergql.GetPreloadModsWithLevel(ctx, TablePreloadMap, models.TableNames.{{ .Name|go }}, "")
+	}
+
+	func Get{{ .Name|go }}PreloadModsWithLevel(ctx context.Context, level string) (queryMods []qm.QueryMod) {
+		return boilergql.GetPreloadModsWithLevel(ctx, TablePreloadMap, models.TableNames.{{ .Name|go }}, level)
+	}
+	{{ end -}}
+{{- end }}
+{{ range $model := .Models }}
+	{{ if .IsPayload -}}
+	var {{ .Name|go }}PreloadLevels = struct {
+		{{ range $field := .Fields }}
+		{{- if $field.IsRelation -}}
+		{{- $field.Name|go }} string
+		{{- end }}
+		{{- end }}
+	}{
+		{{ range $field := .Fields }}
+		{{- if $field.IsRelation -}}
+		{{- $field.Name|go }}: "{{- $field.Name }}",
+		{{- end }}
+		{{- end }}
+	}
+	{{ end }}
+
+
+
+{{- end }}
