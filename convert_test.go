@@ -6,10 +6,6 @@ package govert
 import "testing"
 
 func TestShortType(t *testing.T) {
-	testShortType(t, "gitlab.com/product/app/backend/graphql_models.FlowWhere", "FlowWhere")
-	testShortType(t, "*gitlab.com/product/app/backend/graphql_models.FlowWhere", "*FlowWhere")
-	testShortType(t, "*github.com/web-ridge/go-utils/boilergql/boilergql.GeoPoint", "*GeoPoint")
-	testShortType(t, "github.com/web-ridge/go-utils/boilergql/boilergql.GeoPoint", "GeoPoint")
 	testShortType(t, "*string", "*string")
 	testShortType(t, "string", "string")
 	testShortType(t, "*time.Time", "*time.Time")

@@ -23,11 +23,11 @@
 {{ reserveImport "github.com/volatiletech/null/v8" }}
 
 {{ reserveImport "database/sql" }}
-{{ reserveImport  $.BackendModelsPath }}
-{{ reserveImport  $.FrontendModelsPath }}
+{{ reserveImport  $.Backend.Directory }}
+{{ reserveImport  $.Frontend.Directory }}
 
 
-var TablePreloadMap = map[string]map[string]boilergql.ColumnSetting{
+var TablePreloadMap = map[string]map[string]gqlutils.ColumnSetting{
 	{{ range $model := .Models -}}
 	{{ if $model.IsPreloadable -}}
 		models.TableNames.{{- $model.Name }}: {
@@ -48,11 +48,11 @@ var TablePreloadMap = map[string]map[string]boilergql.ColumnSetting{
 
 	{{ if $model.IsPreloadable -}}
 	func Get{{ .Name|go }}PreloadMods(ctx context.Context) (queryMods []qm.QueryMod) {
-		return boilergql.GetPreloadModsWithLevel(ctx, TablePreloadMap, models.TableNames.{{ .Name|go }}, "")
+		return gqlutils.GetPreloadModsWithLevel(ctx, TablePreloadMap, models.TableNames.{{ .Name|go }}, "")
 	}
 
 	func Get{{ .Name|go }}PreloadModsWithLevel(ctx context.Context, level string) (queryMods []qm.QueryMod) {
-		return boilergql.GetPreloadModsWithLevel(ctx, TablePreloadMap, models.TableNames.{{ .Name|go }}, level)
+		return gqlutils.GetPreloadModsWithLevel(ctx, TablePreloadMap, models.TableNames.{{ .Name|go }}, level)
 	}
 	{{ end -}}
 {{- end }}

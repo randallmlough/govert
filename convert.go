@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"path"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"runtime"
 	"sort"
@@ -13,8 +14,8 @@ import (
 
 	"github.com/99designs/gqlgen/codegen/config"
 	"github.com/99designs/gqlgen/codegen/templates"
-	"github.com/99designs/gqlgen/plugin"
 	"github.com/iancoleman/strcase"
+	. "github.com/logrusorgru/aurora"
 	"github.com/vektah/gqlparser/v2/ast"
 	"github.com/web-ridge/go-pluralize"
 )
@@ -31,15 +32,166 @@ func init() {
 	}
 }
 
-type ModelBuild struct {
-	BackendModelsPath   string
-	FrontendModelsPath  string
+type Convert struct {
+	output         Directory
+	backend        Directory
+	frontend       Directory
+	rootImportPath string
+	primaryKeyType reflect.Type
+}
+
+type Directory struct {
+	Directory string
+	Package   string
+}
+
+func (m *Convert) Name() string {
+	return "convert-generator"
+}
+
+func (m *Convert) MutateConfig(originalCfg *config.Config) error {
+	t := &Template{
+		PackageName: m.output.Package,
+		Backend: Directory{
+			Directory: path.Join(m.rootImportPath, m.backend.Directory),
+			Package:   m.backend.Package,
+		},
+		Frontend: Directory{
+			Directory: path.Join(m.rootImportPath, m.frontend.Directory),
+			Package:   m.frontend.Package,
+		},
+		PrimaryKey: m.primaryKeyType,
+	}
+
+	cfg := copyConfig(*originalCfg)
+
+	fmt.Println(BrightGreen("[convert]"), " get boiler models")
+	boilerModels := GetBoilerModels(m.backend.Directory)
+
+	fmt.Println(BrightGreen("[convert]"), " get extra's from schema")
+	interfaces, enums, scalars := getExtrasFromSchema(cfg.Schema)
+
+	fmt.Println(BrightGreen("[convert]"), " get model with information")
+	models := GetModelsWithInformation(enums, originalCfg, boilerModels)
+
+	t.Models = models
+	t.HasStringPrimaryIDs = HasStringPrimaryIDsInModels(models)
+	t.Interfaces = interfaces
+	t.Enums = enums
+	t.Scalars = scalars
+	if len(t.Models) == 0 {
+		fmt.Println(Red("No models found in graphql so skipping generation").Bold())
+		return nil
+	}
+
+	fmt.Println(BrightGreen("[convert]"), " render preload.gotpl")
+	templates.CurrentImports = nil
+	if renderError := m.generatePreloadFile(cfg, t); renderError != nil {
+		fmt.Println(BrightRed("renderError"), renderError)
+	}
+	templates.CurrentImports = nil
+	fmt.Println(BrightGreen("[convert]"), " render convert.gotpl")
+	if renderError := m.generateConvertFile(cfg, t); renderError != nil {
+		fmt.Println(BrightRed("renderError"), renderError)
+	}
+
+	templates.CurrentImports = nil
+	fmt.Println(BrightGreen("[convert]"), " render convert_input.gotpl")
+	if renderError := m.generateConvertInputFile(cfg, t); renderError != nil {
+		fmt.Println(BrightRed("renderError"), renderError)
+	}
+
+	templates.CurrentImports = nil
+	fmt.Println(BrightGreen("[convert]"), " render filter.gotpl")
+	if renderError := m.generateFilterFile(cfg, t); renderError != nil {
+		fmt.Println(BrightRed("renderError"), renderError)
+	}
+
+	templates.CurrentImports = nil
+	fmt.Println(BrightGreen("[convert]"), " generating ID file")
+	if renderError := m.generateIDFile(cfg, t); renderError != nil {
+		fmt.Println(BrightRed("renderError"), renderError)
+	}
+	return nil
+}
+func (c *Convert) generatePreloadFile(cfg *config.Config, data *Template) error {
+	if err := templates.Render(templates.Options{
+		Template:        getTemplate("preload.gotpl"),
+		PackageName:     c.output.Package,
+		Filename:        c.output.Directory + "/" + "preload.go",
+		Data:            data,
+		GeneratedHeader: true,
+		Packages:        cfg.Packages,
+	}); err != nil {
+		return fmt.Errorf("failed to render ID file %w", err)
+	}
+	return nil
+}
+func (c *Convert) generateConvertFile(cfg *config.Config, data *Template) error {
+	if err := templates.Render(templates.Options{
+		Template:        getTemplate("convert.gotpl"),
+		PackageName:     c.output.Package,
+		Filename:        c.output.Directory + "/" + "convert.go",
+		Data:            data,
+		GeneratedHeader: true,
+		Packages:        cfg.Packages,
+	}); err != nil {
+		return fmt.Errorf("failed to render ID file %w", err)
+	}
+	return nil
+}
+func (c *Convert) generateConvertInputFile(cfg *config.Config, data *Template) error {
+	if err := templates.Render(templates.Options{
+		Template:        getTemplate("convert_input.gotpl"),
+		PackageName:     c.output.Package,
+		Filename:        c.output.Directory + "/" + "convert_input.go",
+		Data:            data,
+		GeneratedHeader: true,
+		Packages:        cfg.Packages,
+	}); err != nil {
+		return fmt.Errorf("failed to render ID file %w", err)
+	}
+	return nil
+}
+func (c *Convert) generateFilterFile(cfg *config.Config, data *Template) error {
+	if err := templates.Render(templates.Options{
+		Template:        getTemplate("filter.gotpl"),
+		PackageName:     c.output.Package,
+		Filename:        c.output.Directory + "/" + "filter.go",
+		Data:            data,
+		GeneratedHeader: true,
+		Packages:        cfg.Packages,
+	}); err != nil {
+		return fmt.Errorf("failed to generate filter file %w", err)
+	}
+	return nil
+}
+
+func (c *Convert) generateIDFile(cfg *config.Config, data *Template) error {
+	if err := templates.Render(templates.Options{
+		Template:        getTemplate("id.gotpl"),
+		PackageName:     c.output.Package,
+		Filename:        c.output.Directory + "/" + "id.go",
+		Data:            data,
+		GeneratedHeader: true,
+		Funcs:           funcMap,
+		Packages:        cfg.Packages,
+	}); err != nil {
+		return fmt.Errorf("failed to generate ID file %w", err)
+	}
+	return nil
+}
+
+type Template struct {
+	Backend             Directory
+	Frontend            Directory
 	HasStringPrimaryIDs bool
 	PackageName         string
 	Interfaces          []*Interface
 	Models              []*Model
 	Enums               []*Enum
 	Scalars             []string
+	PrimaryKey          reflect.Type
 }
 
 type Interface struct {
@@ -123,35 +275,6 @@ type EnumValue struct {
 	NameLower   string
 }
 
-func NewConvertPlugin(directory, backendModelsPath, frontendModelsPath string) plugin.Plugin {
-	return &ConvertPlugin{directory: directory, backendModelsPath: backendModelsPath, frontendModelsPath: frontendModelsPath}
-}
-
-type ConvertPlugin struct {
-	directory          string
-	backendModelsPath  string
-	frontendModelsPath string
-}
-
-var _ plugin.ConfigMutator = &ConvertPlugin{}
-
-func (m *ConvertPlugin) Name() string {
-	return "convert-generator"
-}
-
-func copyConfig(cfg config.Config) *config.Config {
-	return &cfg
-}
-
-func getGoImportFromFile(dir string) string {
-	longPath, err := filepath.Abs(dir)
-	if err != nil {
-		fmt.Println("error while trying to convert folder to gopath", err)
-	}
-	// src/Users/.../go/src/gitlab.com/.../app/backend/graphql_models
-	return strings.TrimPrefix(pathRegex.FindString(longPath), "src/")
-}
-
 func GetModelsWithInformation(enums []*Enum, cfg *config.Config, boilerModels []*BoilerModel) []*Model {
 
 	// get models based on the schema and sqlboiler structs
@@ -169,94 +292,6 @@ func GetModelsWithInformation(enums []*Enum, cfg *config.Config, boilerModels []
 		cfg.Models.Add(m.Name, cfg.Model.ImportPath()+"."+templates.ToGo(m.Name))
 	}
 	return models
-}
-
-func (m *ConvertPlugin) MutateConfig(originalCfg *config.Config) error {
-	b := &ModelBuild{
-		PackageName:        m.directory,
-		FrontendModelsPath: getGoImportFromFile(m.frontendModelsPath),
-		BackendModelsPath:  getGoImportFromFile(m.backendModelsPath),
-	}
-
-	cfg := copyConfig(*originalCfg)
-
-	fmt.Println("[convert] get boiler models")
-	boilerModels := GetBoilerModels(m.backendModelsPath)
-
-	fmt.Println("[convert] get extra's from schema")
-	interfaces, enums, scalars := getExtrasFromSchema(cfg.Schema)
-
-	fmt.Println("[convert] get model with information")
-	models := GetModelsWithInformation(enums, originalCfg, boilerModels)
-
-	b.Models = models
-	b.HasStringPrimaryIDs = HasStringPrimaryIDsInModels(models)
-	b.Interfaces = interfaces
-	b.Enums = enums
-	b.Scalars = scalars
-	if len(b.Models) == 0 {
-		fmt.Println("No models found in graphql so skipping generation")
-		return nil
-	}
-
-	// for _, model := range models {
-	// 	fmt.Println(model.Name, "->", model.BoilerModel.Name)
-	// 	for _, field := range model.Fields {
-	// 		fmt.Println("    ", field.Name, field.Type)
-	// 		fmt.Println("    ", field.BoilerField.Name, field.BoilerField.Type)
-	// 	}
-	// }
-
-	fmt.Println("[convert] render preload.gotpl")
-	templates.CurrentImports = nil
-	if renderError := templates.Render(templates.Options{
-		Template:        getTemplate("preload.gotpl"),
-		PackageName:     m.directory,
-		Filename:        m.directory + "/" + "preload.go",
-		Data:            b,
-		GeneratedHeader: true,
-		Packages:        cfg.Packages,
-	}); renderError != nil {
-		fmt.Println("renderError", renderError)
-	}
-	templates.CurrentImports = nil
-	fmt.Println("[convert] render convert.gotpl")
-	if renderError := templates.Render(templates.Options{
-		Template:        getTemplate("convert.gotpl"),
-		PackageName:     m.directory,
-		Filename:        m.directory + "/" + "convert.go",
-		Data:            b,
-		GeneratedHeader: true,
-		Packages:        cfg.Packages,
-	}); renderError != nil {
-		fmt.Println("renderError", renderError)
-	}
-	templates.CurrentImports = nil
-	fmt.Println("[convert] render convert_input.gotpl")
-	if renderError := templates.Render(templates.Options{
-		Template:        getTemplate("convert_input.gotpl"),
-		PackageName:     m.directory,
-		Filename:        m.directory + "/" + "convert_input.go",
-		Data:            b,
-		GeneratedHeader: true,
-		Packages:        cfg.Packages,
-	}); renderError != nil {
-		fmt.Println("renderError", renderError)
-	}
-	templates.CurrentImports = nil
-	fmt.Println("[convert] render filter.gotpl")
-	if renderError := templates.Render(templates.Options{
-		Template:        getTemplate("filter.gotpl"),
-		PackageName:     m.directory,
-		Filename:        m.directory + "/" + "filter.go",
-		Data:            b,
-		GeneratedHeader: true,
-		Packages:        cfg.Packages,
-	}); renderError != nil {
-		fmt.Println("renderError", renderError)
-	}
-
-	return nil
 }
 
 func getTemplate(filename string) string {
@@ -457,7 +492,7 @@ func enhanceModelsWithFields(enums []*Enum, schema *ast.Schema, cfg *config.Conf
 	}
 }
 
-var ignoreTypePrefixes = []string{"graphql_models", "models", "boilergql"}
+var ignoreTypePrefixes = []string{"graphql_models", "models", "gqlutils"}
 
 func getShortType(longType string) string {
 
@@ -816,13 +851,13 @@ func getConvertConfig(enums []*Enum, model *Model, field *Field) (cc ConvertConf
 			getToBoiler(
 				getBoilerTypeAsText(boilType),
 				getGraphTypeAsText(graphType),
-			), "boilergql.")
+			), "gqlutils.")
 
 		cc.ToGraphQL = strings.TrimPrefix(
 			getToGraphQL(
 				getBoilerTypeAsText(boilType),
 				getGraphTypeAsText(graphType),
-			), "boilergql.")
+			), "gqlutils.")
 
 	} else if graphType != boilType {
 		cc.IsCustom = true
@@ -834,14 +869,14 @@ func getConvertConfig(enums []*Enum, model *Model, field *Field) (cc ConvertConf
 
 			// first unpointer json type if is pointer
 			if strings.HasPrefix(graphType, "*") {
-				cc.ToBoiler = "boilergql.PointerStringToString(VALUE)"
+				cc.ToBoiler = "gqlutils.PointerStringToString(VALUE)"
 			}
 
 			goToUint := getBoilerTypeAsText(boilType) + "ToUint"
 			if goToUint == "IntToUint" {
 				cc.ToGraphQL = "uint(VALUE)"
 			} else if goToUint != "UintToUint" {
-				cc.ToGraphQL = "boilergql." + goToUint + "(VALUE)"
+				cc.ToGraphQL = "gqlutils." + goToUint + "(VALUE)"
 			}
 
 			if field.IsPrimaryNumberID {
@@ -853,13 +888,13 @@ func getConvertConfig(enums []*Enum, model *Model, field *Field) (cc ConvertConf
 			isInt := strings.HasPrefix(strings.ToLower(boilType), "int") && !strings.HasPrefix(strings.ToLower(boilType), "uint")
 
 			if strings.HasPrefix(boilType, "null") {
-				cc.ToBoiler = fmt.Sprintf("boilergql.IDToNullBoiler(%v)", cc.ToBoiler)
+				cc.ToBoiler = fmt.Sprintf("gqlutils.IDToNullBoiler(%v)", cc.ToBoiler)
 				if isInt {
-					cc.ToBoiler = fmt.Sprintf("boilergql.NullUintToNullInt(%v)", cc.ToBoiler)
+					cc.ToBoiler = fmt.Sprintf("gqlutils.NullUintToNullInt(%v)", cc.ToBoiler)
 				}
 
 			} else {
-				cc.ToBoiler = fmt.Sprintf("boilergql.IDToBoiler(%v)", cc.ToBoiler)
+				cc.ToBoiler = fmt.Sprintf("gqlutils.IDToBoiler(%v)", cc.ToBoiler)
 				if isInt {
 					cc.ToBoiler = fmt.Sprintf("int(%v)", cc.ToBoiler)
 				}
@@ -884,11 +919,11 @@ func getConvertConfig(enums []*Enum, model *Model, field *Field) (cc ConvertConf
 }
 
 func getToBoiler(boilType, graphType string) string {
-	return "boilergql." + getGraphTypeAsText(graphType) + "To" + getBoilerTypeAsText(boilType)
+	return "gqlutils." + getGraphTypeAsText(graphType) + "To" + getBoilerTypeAsText(boilType)
 }
 
 func getToGraphQL(boilType, graphType string) string {
-	return "boilergql." + getBoilerTypeAsText(boilType) + "To" + getGraphTypeAsText(graphType)
+	return "gqlutils." + getBoilerTypeAsText(boilType) + "To" + getGraphTypeAsText(graphType)
 }
 
 func getBoilerTypeAsText(boilType string) string {

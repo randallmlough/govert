@@ -1,0 +1,28 @@
+# security
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Binaries for programs and plugins
+*.exe
+*.dll
+*.so
+*.dylib
+
+# logs and outputs
+*.log
+*.test
+*.out
+
+# docker
+Dockerfile.prod
+Dockerfile.dev
+docker-compose.override.yml
+
+# IDEs
+.idea
+
+# misc
+.DS_Store

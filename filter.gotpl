@@ -23,8 +23,8 @@
 
 
 {{ reserveImport "database/sql" }}
-{{ reserveImport  $.BackendModelsPath }}
-{{ reserveImport  $.FrontendModelsPath }}
+{{ reserveImport  $.Backend.Directory }}
+{{ reserveImport  $.Frontend.Directory }}
 
 
 // const regexSign = `'`
@@ -44,7 +44,7 @@ func appendSubQuery(queryMods []qm.QueryMod, q *queries.Query) []qm.QueryMod {
 	return append(queryMods, qm.Where(fmt.Sprintf("EXISTS(%v)", qsClean), args...))
 }
 
-func BooleanFilterToMods(m *graphql_models.BooleanFilter, column string) []qm.QueryMod {
+func BooleanFilterToMods(m *{{ $.Frontend.Package }}.BooleanFilter, column string) []qm.QueryMod {
 	if m == nil {
 		return nil
 	}
@@ -58,7 +58,7 @@ func BooleanFilterToMods(m *graphql_models.BooleanFilter, column string) []qm.Qu
 	return queryMods
 }
 
-func IDFilterToMods(m *graphql_models.IDFilter, column string) []qm.QueryMod {
+func IDFilterToMods(m *{{ $.Frontend.Package }}.IDFilter, column string) []qm.QueryMod {
 	if m == nil {
 		return nil
 	}
@@ -71,23 +71,23 @@ func IDFilterToMods(m *graphql_models.IDFilter, column string) []qm.QueryMod {
 		queryMods = append(queryMods, qmhelper.Where(column, qmhelper.NEQ, *m.NotEqualTo))
 	}
 	if len(m.In) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + in, boilergql.StringsToInterfaces(m.In)...))
+		queryMods = append(queryMods, qm.WhereIn(column + in, gqlutils.StringsToInterfaces(m.In)...))
 	}
 	if len(m.NotIn) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + notIn, boilergql.StringsToInterfaces(m.NotIn)...))
+		queryMods = append(queryMods, qm.WhereIn(column + notIn, gqlutils.StringsToInterfaces(m.NotIn)...))
 	}
 	{{- else }}
 	if m.EqualTo != nil {
-		queryMods = append(queryMods, qmhelper.Where(column, qmhelper.EQ, boilergql.IDToBoiler(*m.EqualTo)))
+		queryMods = append(queryMods, qmhelper.Where(column, qmhelper.EQ, gqlutils.IDToBoiler(*m.EqualTo)))
 	}
 	if m.NotEqualTo != nil {
-		queryMods = append(queryMods, qmhelper.Where(column, qmhelper.NEQ, boilergql.IDToBoiler(*m.NotEqualTo)))
+		queryMods = append(queryMods, qmhelper.Where(column, qmhelper.NEQ, gqlutils.IDToBoiler(*m.NotEqualTo)))
 	}
 	if len(m.In) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + in, boilergql.IDsToBoilerInterfaces(m.In)...))
+		queryMods = append(queryMods, qm.WhereIn(column + in, gqlutils.IDsToBoilerInterfaces(m.In)...))
 	}
 	if len(m.NotIn) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + notIn, boilergql.IDsToBoilerInterfaces(m.NotIn)...))
+		queryMods = append(queryMods, qm.WhereIn(column + notIn, gqlutils.IDsToBoilerInterfaces(m.NotIn)...))
 	}
 	{{- end }}
 	return queryMods
@@ -95,7 +95,7 @@ func IDFilterToMods(m *graphql_models.IDFilter, column string) []qm.QueryMod {
 
 
 
-func StringFilterToMods(m *graphql_models.StringFilter, column string) []qm.QueryMod {
+func StringFilterToMods(m *{{ $.Frontend.Package }}.StringFilter, column string) []qm.QueryMod {
 	if m == nil {
 		return nil
 	}
@@ -130,17 +130,17 @@ func StringFilterToMods(m *graphql_models.StringFilter, column string) []qm.Quer
 	}
 
 	if len(m.In) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + in, boilergql.IDsToBoilerInterfaces(m.In)...))
+		queryMods = append(queryMods, qm.WhereIn(column + in, gqlutils.IDsToBoilerInterfaces(m.In)...))
 	}
 	if len(m.NotIn) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + notIn, boilergql.IDsToBoilerInterfaces(m.NotIn)...))
+		queryMods = append(queryMods, qm.WhereIn(column + notIn, gqlutils.IDsToBoilerInterfaces(m.NotIn)...))
 	}
 	
 	return queryMods
 }
 
 
-func FloatFilterToMods(m *graphql_models.FloatFilter, column string) []qm.QueryMod {
+func FloatFilterToMods(m *{{ $.Frontend.Package }}.FloatFilter, column string) []qm.QueryMod {
 	if m == nil {
 		return nil
 	}
@@ -164,15 +164,15 @@ func FloatFilterToMods(m *graphql_models.FloatFilter, column string) []qm.QueryM
 		queryMods = append(queryMods, qmhelper.Where(column, qmhelper.GTE, *m.MoreThanOrEqualTo))
 	}
 	if len(m.In) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + in, boilergql.FloatsToInterfaces(m.In)...))
+		queryMods = append(queryMods, qm.WhereIn(column + in, gqlutils.FloatsToInterfaces(m.In)...))
 	}
 	if len(m.NotIn) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + notIn, boilergql.FloatsToInterfaces(m.NotIn)...))
+		queryMods = append(queryMods, qm.WhereIn(column + notIn, gqlutils.FloatsToInterfaces(m.NotIn)...))
 	}
 	return queryMods
 }
 
-func IntFilterToMods(m *graphql_models.IntFilter, column string) []qm.QueryMod {
+func IntFilterToMods(m *{{ $.Frontend.Package }}.IntFilter, column string) []qm.QueryMod {
 	if m == nil {
 		return nil
 	}
@@ -196,10 +196,10 @@ func IntFilterToMods(m *graphql_models.IntFilter, column string) []qm.QueryMod {
 		queryMods = append(queryMods, qmhelper.Where(column, qmhelper.GTE, *m.MoreThanOrEqualTo))
 	}
 	if len(m.In) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + in, boilergql.IntsToInterfaces(m.In)...))
+		queryMods = append(queryMods, qm.WhereIn(column + in, gqlutils.IntsToInterfaces(m.In)...))
 	}
 	if len(m.NotIn) > 0 {
-		queryMods = append(queryMods, qm.WhereIn(column + notIn, boilergql.IntsToInterfaces(m.NotIn)...))
+		queryMods = append(queryMods, qm.WhereIn(column + notIn, gqlutils.IntsToInterfaces(m.NotIn)...))
 	}
 	return queryMods
 }
@@ -207,7 +207,7 @@ func IntFilterToMods(m *graphql_models.IntFilter, column string) []qm.QueryMod {
 {{ range $model := .Models }}
 	{{with .Description }} {{.|prefixLines "// "}} {{end}}
 	{{- if .IsFilter -}}
-		func {{ .Name|go }}ToMods(m *graphql_models.{{ .Name|go }}) []qm.QueryMod {
+		func {{ .Name|go }}ToMods(m *{{ $.Frontend.Package }}.{{ .Name|go }}) []qm.QueryMod {
 			if m == nil {
 				return nil
 			}
@@ -229,7 +229,7 @@ func IntFilterToMods(m *graphql_models.IntFilter, column string) []qm.QueryMod {
 		}
 	{{ end }}
 	{{- if .IsWhere  -}}
-		func {{ .Name|go }}SubqueryToMods(m *graphql_models.{{ .Name|go }}, foreignColumn string) []qm.QueryMod {
+		func {{ .Name|go }}SubqueryToMods(m *{{ $.Frontend.Package }}.{{ .Name|go }}, foreignColumn string) []qm.QueryMod {
 			if m == nil {
 				return nil
 			}
@@ -249,7 +249,7 @@ func IntFilterToMods(m *graphql_models.IntFilter, column string) []qm.QueryMod {
 			return queryMods
 		} 
 		
-		func {{ .Name|go }}ToMods(m *graphql_models.{{ .Name|go }}, withPrimaryID bool) []qm.QueryMod {
+		func {{ .Name|go }}ToMods(m *{{ $.Frontend.Package }}.{{ .Name|go }}, withPrimaryID bool) []qm.QueryMod {
 			if m == nil {
 				return nil
 			}

@@ -1,0 +1,279 @@
+{{ reserveImport "strconv"  }}
+{{ reserveImport "strings"  }}
+
+{{ reserveImport "github.com/iancoleman/strcase" }}
+{{ reserveImport "github.com/volatiletech/null/v8" }}
+
+{{ reserveImport  $.Backend.Directory }}
+{{ reserveImport  $.Frontend.Directory }}
+
+type RemovedID struct {
+	ID {{$.PrimaryKey}}
+}
+
+{{ if isBuiltin $.PrimaryKey  -}}
+	func RemovedIDToType(removedId RemovedID) {{ $.PrimaryKey}} {
+		return removedId.ID
+	}
+
+	func RemovedIDsToType(removedIds []RemovedID) []{{$.PrimaryKey}} {
+		ids := make([]{{$.PrimaryKey}}, len(removedIds))
+		for index, id := range removedIds {
+			ids[index] = RemovedIDToType(id)
+		}
+		return ids
+	}
+{{ else }}
+	func RemovedIDToType(removedId RemovedID) {{ getUnderlyingType $.PrimaryKey}} {
+		return {{ getUnderlyingType $.PrimaryKey}}(removedId.ID)
+	}
+
+	func RemovedIDsToType(removedIds []RemovedID) []{{ getUnderlyingType $.PrimaryKey}} {
+		ids := make([]{{ getUnderlyingType $.PrimaryKey}}, len(removedIds))
+		for index, id := range removedIds {
+			ids[index] = RemovedIDToType(id)
+		}
+		return ids
+	}
+{{ end }}
+
+{{ if isBuiltin $.PrimaryKey  -}}
+	func IDToType(ID {{$.PrimaryKey}}) {{$.PrimaryKey}} {
+		return ID
+	}
+
+	func IDsToType(IDs []{{$.PrimaryKey}}) []{{$.PrimaryKey}} {
+		return IDs
+	}
+
+	func IDsToInterfaces(IDs []{{$.PrimaryKey}}) []interface{} {
+		interfaces := make([]interface{}, len(IDs))
+		for index, id := range IDs {
+			interfaces[index] = id
+		}
+		return interfaces
+	}
+
+	{{ if ne $.PrimaryKey.String "string" }}
+		func IDStringToType(ID string) {{$.PrimaryKey}} {
+			splitted := strings.Split(ID, "-")
+			if len(splitted) > 1 {
+				// nolint: errcheck
+				{{- if eq $.PrimaryKey.String "uint" }}
+					i, _ := strconv.ParseUint(splitted[1], 10, 64)
+				{{ else }}
+					i, _ := strconv.Atoi(splitted[1])
+				{{ end -}}
+				return {{$.PrimaryKey}}(i)
+			}
+			return {{$.PrimaryKey}}(0)
+		}
+	{{ else }}
+		func stringToInt(ID string) int {
+			// nolint: errcheck
+			i, _ := strconv.Atoi(ID)
+			return i
+		}
+	{{ end }}
+{{ else }}
+	func IDToType(ID {{$.PrimaryKey}}) {{ getUnderlyingType $.PrimaryKey}} {
+		return {{ getUnderlyingType $.PrimaryKey}}(ID)
+	}
+
+	func IDsToType(IDs []{{$.PrimaryKey}}) []{{ getUnderlyingType $.PrimaryKey}} {
+		ids := make([]{{ getUnderlyingType $.PrimaryKey}}, len(IDs))
+		for index, id := range IDs {
+			ids[index] = IDToType(id)
+		}
+		return ids
+	}
+
+	func IDsToInterfaces(IDs []{{$.PrimaryKey}}) []interface{} {
+		interfaces := make([]interface{}, len(IDs))
+		for index, id := range IDs {
+			interfaces[index] = IDToType(id)
+		}
+		return interfaces
+	}
+
+{{ end }}
+
+{{ if isBuiltin $.PrimaryKey }}
+	func IDToUint(id {{$.PrimaryKey}}) uint {
+	{{- if eq $.PrimaryKey.String "uint" }}
+		return IDToType(id)
+	{{ else }}
+		{{- if eq $.PrimaryKey.String "int" }}
+			return uint(id)
+		{{else}}
+			return uint(stringToInt(id))
+		{{ end -}}
+	{{ end -}}
+	}
+
+	func IDsToUint(ids []{{$.PrimaryKey}}) []uint {
+		{{- if eq $.PrimaryKey.String "uint" }}
+			return IDsToType(ids)
+		{{ else }}
+			uints := make([]uint, len(ids))
+			for index, id := range ids {
+				uints[index] = IDToUint(id)
+			}
+			return uints
+		{{ end -}}
+	}
+{{ else }}
+	func IDToUint(id {{$.PrimaryKey}}) uint {
+	{{- if eq (getUnderlyingType $.PrimaryKey) "uint" }}
+		return IDToType(id)
+	{{ else }}
+		{{- if eq (getUnderlyingType $.PrimaryKey) "int" }}
+			return uint(id)
+		{{else}}
+			return uint(stringToInt(id))
+		{{ end -}}
+	{{ end -}}
+	}
+
+	func IDsToUint(ids []{{$.PrimaryKey}}) []uint {
+		{{- if eq (getUnderlyingType $.PrimaryKey) "uint" }}
+			return IDsToType(ids)
+		{{ else }}
+			uints := make([]uint, len(ids))
+			for index, id := range ids {
+				uints[index] = IDToUint(id)
+			}
+			return uints
+		{{ end -}}
+	}
+{{ end }}
+
+{{ if isBuiltin $.PrimaryKey }}
+	func IDToInt(id {{$.PrimaryKey}}) int {
+	{{- if eq $.PrimaryKey.String "int" }}
+		return IDToType(id)
+	{{ else }}
+		{{- if eq $.PrimaryKey.String "uint" }}
+			return int(id)
+		{{else}}
+			return stringToInt(id)
+		{{ end -}}
+	{{ end -}}
+	}
+
+	func IDsToInt(ids []{{$.PrimaryKey}}) []int {
+	{{- if eq $.PrimaryKey.String "int" }}
+		return IDsToType(ids)
+	{{ else }}
+		ints := make([]int, len(ids))
+		for index, id := range ids {
+			ints[index] = IDToInt(id)
+		}
+		return ints
+	{{ end -}}
+	}
+{{ else }}
+	func IDToInt(id {{$.PrimaryKey}}) int {
+	{{- if eq (getUnderlyingType $.PrimaryKey) "int" }}
+		return IDToType(id)
+	{{ else }}
+		{{- if eq (getUnderlyingType $.PrimaryKey) "uint" }}
+			return uint(id)
+		{{else}}
+			return uint(stringToInt(id))
+		{{ end -}}
+	{{ end -}}
+	}
+
+	func IDsToInt(ids []{{$.PrimaryKey}}) []int {
+	{{- if eq (getUnderlyingType $.PrimaryKey) "int" }}
+		return IDsToType(ids)
+	{{ else }}
+		uints := make([]int, len(ids))
+		for index, id := range ids {
+			ints[index] = IDToInt(id)
+		}
+		return ints
+	{{ end -}}
+	}
+{{ end }}
+
+{{ if isBuiltin $.PrimaryKey }}
+	func IDToString(id {{$.PrimaryKey}}) string {
+	{{- if eq $.PrimaryKey.String "string" }}
+		return IDToType(id)
+	{{ else }}
+		return strconv.Itoa(int(id))
+	{{ end -}}
+	}
+
+	func IDsToString(ids []{{$.PrimaryKey}}) []string {
+	{{- if eq $.PrimaryKey.String "string" }}
+		return IDsToType(ids)
+	{{ else }}
+		ss := make([]string, len(ids))
+		for index, id := range ids {
+			ss[index] = IDToString(id)
+		}
+		return ss
+	{{ end -}}
+	}
+{{ else }}
+	func IDToString(id {{$.PrimaryKey}}) string {
+	{{- if eq (getUnderlyingType $.PrimaryKey) "string" }}
+		return IDToType(id)
+	{{ else }}
+		return strconv.Itoa(int(id))
+	{{ end -}}
+	}
+
+	func IDsToString(ids []{{$.PrimaryKey}}) []string {
+	{{- if eq (getUnderlyingType $.PrimaryKey) "string" }}
+		return IDsToType(ids)
+	{{ else }}
+		ss := make([]string, len(ids))
+		for index, id := range ids {
+			ss[index] = IDToString(id)
+		}
+		return ss
+	{{ end -}}
+	}
+
+{{ end }}
+
+{{ if isBuiltin $.PrimaryKey }}
+	func IDToNull(ID {{$.PrimaryKey}}) null.{{titleCase $.PrimaryKey.String}} {
+		id := IDToType(ID)
+		if {{if eq $.PrimaryKey.String "string"}}id == ""{{else}}id <= 0{{end}} {
+			return null.New{{titleCase $.PrimaryKey.String}}(id, false)
+		}
+		return null.{{titleCase $.PrimaryKey.String}}{
+			{{titleCase $.PrimaryKey.String}}: id,
+			Valid: true,
+		}
+	}
+{{ else }}
+	func IDToNull(ID {{$.PrimaryKey}}) null.{{titleCase (getUnderlyingType $.PrimaryKey)}} {
+		id := IDToType(ID)
+		if {{if eq (getUnderlyingType $.PrimaryKey) "string"}}id == ""{{else}}id <= 0{{end}} {
+			return null.New{{titleCase (getUnderlyingType $.PrimaryKey)}}(id, false)
+		}
+		return null.{{titleCase (getUnderlyingType $.PrimaryKey)}}{
+			{{titleCase (getUnderlyingType $.PrimaryKey)}}: id,
+		Valid: true,
+		}
+	}
+{{ end }}
+
+
+func IDToGraphQL(id {{$.PrimaryKey}}, tableName string) string {
+	return strcase.ToLowerCamel(tableName) + "-" + IDToString(id)
+}
+
+func IDsToGraphQL(ids []{{$.PrimaryKey}}, tableName string) []string {
+	stringIDs := make([]string, len(ids))
+	for index, id := range ids {
+		stringIDs[index] = IDToGraphQL(id, tableName)
+	}
+	return stringIDs
+}

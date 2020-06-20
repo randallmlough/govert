@@ -24,11 +24,11 @@
 {{ reserveImport "github.com/volatiletech/null/v8" }}
 
 {{ reserveImport "database/sql" }}
-{{ reserveImport  $.BackendModelsPath }}
-{{ reserveImport  $.FrontendModelsPath }}
+{{ reserveImport  $.Backend.Directory }}
+{{ reserveImport  $.Frontend.Directory }}
 
 {{ range $enum := .Enums }}
-	func NullDotStringToPointer{{ .Name|go }}(v null.String) *graphql_models.{{ .Name|go }} {
+	func NullDotStringToPointer{{ .Name|go }}(v null.String) *{{ $.Frontend.Package }}.{{ .Name|go }} {
 		s := StringTo{{ .Name|go }}(v.String)
 		if s == "" {
 			return nil
@@ -36,23 +36,23 @@
 		return &s
 	}
 
-	func NullDotStringTo{{ .Name|go }}(v null.String) graphql_models.{{ .Name|go }} {
+	func NullDotStringTo{{ .Name|go }}(v null.String) {{ $.Frontend.Package }}.{{ .Name|go }} {
 		if !v.Valid {
 			return ""
 		}
 		return StringTo{{ .Name|go }}(v.String)
 	}
 
-	func StringTo{{ .Name|go }}(v string) graphql_models.{{ .Name|go }} {
+	func StringTo{{ .Name|go }}(v string) {{ $.Frontend.Package }}.{{ .Name|go }} {
 		{{- range $value := .Values }}
 			if v == "{{ .NameLower }}" {
-				return graphql_models.{{$enum.Name|go}}{{ .Name|go }}
+				return {{ $.Frontend.Package }}.{{$enum.Name|go}}{{ .Name|go }}
 			}
 		{{- end }}
 		return ""
 	}
 
-	func StringToPointer{{ .Name|go }}(v string) *graphql_models.{{ .Name|go }} {
+	func StringToPointer{{ .Name|go }}(v string) *{{ $.Frontend.Package }}.{{ .Name|go }} {
 		s := StringTo{{ .Name|go }}(v)
 		if s == "" {
 			return nil
@@ -60,28 +60,28 @@
 		return &s
 	}
 
-	func Pointer{{ .Name|go }}ToString(v *graphql_models.{{ .Name|go }}) string {
+	func Pointer{{ .Name|go }}ToString(v *{{ $.Frontend.Package }}.{{ .Name|go }}) string {
 		if v == nil {
 			return ""
 		}
 		return {{ .Name|go }}ToString(*v)
 	}
 
-	func Pointer{{ .Name|go }}ToNullDotString(v *graphql_models.{{ .Name|go }}) null.String {
+	func Pointer{{ .Name|go }}ToNullDotString(v *{{ $.Frontend.Package }}.{{ .Name|go }}) null.String {
 		if v == nil {
 			return null.NewString("", false)
 		}
 		return {{ .Name|go }}ToNullDotString(*v)
 	}
 
-	func {{ .Name|go }}ToNullDotString(v graphql_models.{{ .Name|go }}) null.String {
+	func {{ .Name|go }}ToNullDotString(v {{ $.Frontend.Package }}.{{ .Name|go }}) null.String {
 		s := {{ .Name|go }}ToString(v)
 		return null.NewString(s, s != "")
 	}
 
-	func {{ .Name|go }}ToString(v graphql_models.{{ .Name|go }}) string {
+	func {{ .Name|go }}ToString(v {{ $.Frontend.Package }}.{{ .Name|go }}) string {
 		{{- range $value := .Values }}
-			if v == graphql_models.{{$enum.Name|go}}{{ .Name|go }} {
+			if v == {{ $.Frontend.Package }}.{{$enum.Name|go}}{{ .Name|go }} {
 				return "{{ .NameLower }}"
 			}
 		{{- end }}
@@ -94,38 +94,38 @@
 	{{- if .IsNormal  -}}
 
 		{{- if .HasStringPrimaryID }}
-			func {{ .Name|go }}WithStringID(id string) *graphql_models.{{ .Name|go }} {
-				return &graphql_models.{{ .Name|go }}{
+			func {{ .Name|go }}WithStringID(id string) *{{ $.Frontend.Package }}.{{ .Name|go }} {
+				return &{{ $.Frontend.Package }}.{{ .Name|go }}{
 					ID: id,
 				}
 			}
 
-			func {{ .Name|go }}WithNullDotStringID(id null.String) *graphql_models.{{ .Name|go }} {
+			func {{ .Name|go }}WithNullDotStringID(id null.String) *{{ $.Frontend.Package }}.{{ .Name|go }} {
 				return {{ .Name|go }}WithStringID(id.String)
 			}
 		{{- else }}
-			func {{ .Name|go }}WithUintID(id uint) *graphql_models.{{ .Name|go }} {
-				return &graphql_models.{{ .Name|go }}{
+			func {{ .Name|go }}WithUintID(id uint) *{{ $.Frontend.Package }}.{{ .Name|go }} {
+				return &{{ $.Frontend.Package }}.{{ .Name|go }}{
 					ID: {{ $model.Name|go }}IDToGraphQL(id),
 				}
 			}
 
-			func {{ .Name|go }}WithIntID(id int) *graphql_models.{{ .Name|go }} {
+			func {{ .Name|go }}WithIntID(id int) *{{ $.Frontend.Package }}.{{ .Name|go }} {
 				return {{ .Name|go }}WithUintID(uint(id))
 			}
 
-			func {{ .Name|go }}WithNullDotUintID(id null.Uint) *graphql_models.{{ .Name|go }} {
+			func {{ .Name|go }}WithNullDotUintID(id null.Uint) *{{ $.Frontend.Package }}.{{ .Name|go }} {
 				return {{ .Name|go }}WithUintID(id.Uint)
 			}
 
-			func {{ .Name|go }}WithNullDotIntID(id null.Int) *graphql_models.{{ .Name|go }} {
+			func {{ .Name|go }}WithNullDotIntID(id null.Int) *{{ $.Frontend.Package }}.{{ .Name|go }} {
 				return {{ .Name|go }}WithUintID(uint(id.Int))
 			}
 			
 		{{- end }}
 
-		func {{ .PluralName|go }}ToGraphQL(am []*models.{{ .Name|go }})( []*graphql_models.{{ .Name|go }}) {
-			ar := make([]*graphql_models.{{ .Name|go }}, len(am))
+		func {{ .PluralName|go }}ToGraphQL(am []*models.{{ .Name|go }})( []*{{ $.Frontend.Package }}.{{ .Name|go }}) {
+			ar := make([]*{{ $.Frontend.Package }}.{{ .Name|go }}, len(am))
 			for i,m := range am {
 				ar[i] = {{ .Name|go }}ToGraphQL(m)
 			}
@@ -135,18 +135,18 @@
 		{{ range $field := .Fields }}
 			{{- if $field.IsPrimaryNumberID -}}
 				func {{ $model.Name|go }}IDToGraphQL(v uint) string {
-					return boilergql.IDToGraphQL(v, models.TableNames.{{ $model.Name|go }})
+					return gqlutils.IDToGraphQL(v, models.TableNames.{{ $model.Name|go }})
 				}
 			{{- end -}}
 		{{- end }}
 
 
-	func {{ .Name|go }}ToGraphQL(m *models.{{ .BoilerModel.Name|go }})( *graphql_models.{{ .Name|go }}) {
+	func {{ .Name|go }}ToGraphQL(m *models.{{ .BoilerModel.Name|go }})( *{{ $.Frontend.Package }}.{{ .Name|go }}) {
 		if m == nil {
 			return nil
 		}
 
-		r := &graphql_models.{{ .Name|go }}{
+		r := &{{ $.Frontend.Package }}.{{ .Name|go }}{
 			{{ range $field := .Fields }}
 				{{- with .Description }}
 					{{.|prefixLines "// "}}
@@ -171,7 +171,7 @@
 					} 
 				{{- else }}	
 				
-				if boilergql.{{ $field.ConvertConfig.BoilerTypeAsText }}IsFilled(m.{{ $field.Name|go }}ID) {
+				if gqlutils.{{ $field.ConvertConfig.BoilerTypeAsText }}IsFilled(m.{{ $field.Name|go }}ID) {
 					if m.R != nil && m.R.{{ $field.Name|go }} != nil  {
 						r.{{ $field.Name|go }} = {{ $field.BoilerField.Relationship.Name|go }}ToGraphQL(m.R.{{ $field.Name|go }})
 					} else {
@@ -188,11 +188,11 @@
 		{{ range $field := .Fields }}
 			{{- if $field.IsPrimaryNumberID }}
 				func {{ $model.Name|go }}ID(v string) {{ $field.BoilerField.Type }} {
-					return boilergql.IDToBoiler{{ $field.BoilerField.Type|go }}(v)
+					return gqlutils.IDToBoiler{{ $field.BoilerField.Type|go }}(v)
 				}
 
 				func {{ $model.Name|go }}IDs(a []string) []{{ $field.BoilerField.Type }} {
-					return boilergql.IDsToBoiler{{ $field.BoilerField.Type|go }}(a)
+					return gqlutils.IDsToBoiler{{ $field.BoilerField.Type|go }}(a)
 				}
 				
 			{{- end -}}
